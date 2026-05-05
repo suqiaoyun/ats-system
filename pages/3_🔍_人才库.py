@@ -53,15 +53,14 @@ with col1:
         st.session_state.filter_by_position_title = None
 
 with col2:
-    status_options = ["全部", "new", "active", "archived", "hired", "public_pool"]
-    status_labels = {"全部": None, "new": "新入库", "active": "流程中", "archived": "已归档", "hired": "已入职", "public_pool": "公海池"}
+    status_labels = {"全部": "全部", "new": "新入库", "active": "流程中", "archived": "已归档", "hired": "已入职", "public_pool": "公海池"}
     selected_status_label = st.selectbox(
         "📊 状态筛选",
         list(status_labels.keys()),
         format_func=lambda x: status_labels[x],
         key="talent_status_filter",
     )
-    selected_status = status_labels[selected_status_label]
+    selected_status = None if selected_status_label == "全部" else selected_status_label
 
 with col3:
     search_text = st.text_input("🔎 搜索", placeholder="姓名、手机、学校...", key="talent_search")
