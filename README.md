@@ -32,7 +32,7 @@ pip install -r requirements.txt
 3. 在 Storage 中创建名为 `resumes` 的 Bucket（公开访问）
 4. 在 Project Settings > API 获取：
    - `Project URL`
-   - `service_role key`（注意：是 service_role，不是 anon key）
+   - `service_role key`（注意：是 secretkey，不是 anon key）
 
 ### 3. 配置 DeepSeek API
 
