@@ -51,6 +51,7 @@ def parse_resume_with_ai(resume_text: str, jd_text: str = "",
 {
   "name": "姓名",
   "gender": "性别（男/女）",
+  "age": "年龄（数字，如29）",
   "phone": "手机号码",
   "email": "邮箱",
   "education": "最高学历（如：硕士、本科、博士、大专等）",
@@ -119,6 +120,7 @@ def parse_resume_with_ai(resume_text: str, jd_text: str = "",
         return {
             "name": str(result.get("name", "未知")),
             "gender": str(result.get("gender", "未知")),
+            "age": result.get("age", None),
             "phone": str(result.get("phone", "未知")),
             "email": str(result.get("email", "未知")),
             "education": str(result.get("education", "未知")),
@@ -149,6 +151,7 @@ def _fallback_parse_result(partial_text: str = "") -> dict:
     return {
         "name": "未识别",
         "gender": "未知",
+        "age": None,
         "phone": "未知",
         "email": "未知",
         "education": "未知",
@@ -168,7 +171,9 @@ def _fallback_parse_result(partial_text: str = "") -> dict:
 
 
 def extract_text_from_pdf(file_bytes: bytes) -> str:
-    """从 PDF 文件中提取文本。"""
+    """从 PDF 文件中提取文本，支持多种解析引擎。"""
+    text = ""
+    # 方法1: PyPDF2
     try:
         from PyPDF2 import PdfReader
         import io
@@ -178,10 +183,29 @@ def extract_text_from_pdf(file_bytes: bytes) -> str:
             page_text = page.extract_text()
             if page_text:
                 text_parts.append(page_text)
-        return "\n".join(text_parts)
-    except Exception as e:
-        st.error(f"PDF 解析失败: {e}")
-        return ""
+        text = "\n".join(text_parts)
+        if len(text.strip()) > 20:
+            return text
+    except Exception:
+        pass
+
+    # 方法2: pypdf (PyPDF2 的升级版，兼容性更好)
+    try:
+        import pypdf
+        import io
+        reader = pypdf.PdfReader(io.BytesIO(file_bytes))
+        text_parts = []
+        for page in reader.pages:
+            page_text = page.extract_text()
+            if page_text:
+                text_parts.append(page_text)
+        text = "\n".join(text_parts)
+        if len(text.strip()) > 20:
+            return text
+    except Exception:
+        pass
+
+    return text if len(text.strip()) > 10 else ""
 
 
 def extract_text_from_docx(file_bytes: bytes) -> str:
