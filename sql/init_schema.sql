@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS candidates (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT DEFAULT '',
     gender TEXT DEFAULT '',
+    age INT DEFAULT NULL,
     phone TEXT DEFAULT '',
     email TEXT DEFAULT '',
     education TEXT DEFAULT '',
@@ -129,3 +130,9 @@ CREATE INDEX IF NOT EXISTS idx_pipeline_current ON candidate_pipeline(is_current
 INSERT INTO users (email, username, password_hash, role)
 VALUES ('admin@ats.com', '管理员', '$2b$12$LJ3m4ys3GZfnYMz8kVsKaOTSxGHLJfXJru5WoR.KqD7IFNa2KyvGq', 'admin')
 ON CONFLICT (email) DO NOTHING;
+
+-- ========================================
+-- 迁移: 新增 age 字段 (2026-05-07)
+-- 如已建表请执行:
+-- ALTER TABLE candidates ADD COLUMN IF NOT EXISTS age INT DEFAULT NULL;
+-- ========================================
