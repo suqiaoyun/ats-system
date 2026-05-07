@@ -3,13 +3,10 @@
 """
 import streamlit as st
 import pandas as pd
-import time
-from datetime import datetime
 
 from utils.auth import check_global_password, ensure_user_session
 from utils.supabase_client import (
-    get_positions, create_candidate, update_candidate,
-    link_candidate_to_position, get_supabase_client,
+    get_positions, create_candidate, link_candidate_to_position,
 )
 from utils.deepseek_client import (
     extract_text_from_file, parse_resume_with_ai,
@@ -66,6 +63,16 @@ if uploaded_files:
     st.markdown("---")
     st.subheader(f"📋 待解析简历 ({len(uploaded_files)} 份)")
 
+    # 缓存上传的文件内容，避免 rerun 后丢失
+    if "uploaded_file_cache" not in st.session_state:
+        st.session_state.uploaded_file_cache = {}
+
+    # 把本次上传的文件缓存起来
+    for f in uploaded_files:
+        if f.name not in st.session_state.uploaded_file_cache:
+            f.seek(0)
+            st.session_state.uploaded_file_cache[f.name] = f.read()
+
     # 准备解析所有简历
     if "parsed_results" not in st.session_state:
         st.session_state.parsed_results = {}
@@ -77,13 +84,18 @@ if uploaded_files:
         if file_key in st.session_state.parsed_results:
             continue
 
+        # 从缓存取文件内容
+        file_bytes = st.session_state.uploaded_file_cache.get(file_key)
+        if file_bytes is None:
+            st.error(f"❌ {uploaded_file.name} 文件内容丢失，请重新上传")
+            continue
+
         with st.spinner(f"🤖 AI 正在分析: {uploaded_file.name} ..."):
             # 提取文本
-            file_bytes = uploaded_file.read()
             resume_text = extract_text_from_file(file_bytes, uploaded_file.name)
 
-            if not resume_text:
-                st.error(f"❌ {uploaded_file.name} 文本提取失败")
+            if not resume_text or len(resume_text.strip()) < 10:
+                st.error(f"❌ {uploaded_file.name} 文本提取失败（可能是扫描件或加密 PDF），请换用文字版简历")
                 continue
 
             # AI 解析
@@ -91,25 +103,6 @@ if uploaded_files:
             hard_req = selected_position.get("hard_requirements", "")
             result = parse_resume_with_ai(resume_text, jd_text, hard_req)
 
-            # 保存文件到 Supabase Storage
-            storage_path = ""
-            try:
-                supabase = get_supabase_client()
-                if supabase:
-                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                    storage_filename = f"{timestamp}_{uploaded_file.name}"
-                    supabase.storage.from_("resumes").upload(
-                        path=storage_filename,
-                        file=file_bytes,
-                        file_options={"content-type": uploaded_file.type or "application/octet-stream"},
-                    )
-                    storage_path = storage_filename
-            except Exception as e:
-                st.warning(f"文件存储失败（数据仍会保存）: {e}")
-
-            result["raw_resume_text"] = resume_text[:5000]
-            result["resume_file_path"] = storage_path
-            result["resume_file_name"] = uploaded_file.name
             result["position_title"] = selected_title
 
             st.session_state.parsed_results[file_key] = result
@@ -129,15 +122,14 @@ if uploaded_files:
                 "序号": i + 1,
                 "姓名": r.get("name", "-"),
                 "性别": r.get("gender", "-"),
+                "年龄": r.get("age", "-"),
+                "手机号": r.get("phone", "-"),
                 "学历": r.get("education", "-"),
                 "院校": r.get("school", "-"),
-                "专业": r.get("major", "-"),
-                "手机号": r.get("phone", "-"),
-                "邮箱": r.get("email", "-"),
                 "硬性匹配": "✅" if r.get("hard_match") else "❌",
                 "AI 评分": f"{score_emoji} {score}",
-                "核心优势": (r.get("ai_strengths", "") or "")[:60],
-                "潜在风险": (r.get("ai_risks", "") or "")[:60],
+                "核心优势": (r.get("ai_strengths", "") or "")[:80],
+                "潜在风险": (r.get("ai_risks", "") or "")[:80],
             })
 
         df_preview = pd.DataFrame(table_data)
@@ -150,6 +142,7 @@ if uploaded_files:
                 with col_a:
                     st.markdown(f"**姓名:** {r.get('name', '-')}")
                     st.markdown(f"**性别:** {r.get('gender', '-')}")
+                    st.markdown(f"**年龄:** {r.get('age', '-')}")
                     st.markdown(f"**手机:** {r.get('phone', '-')}")
                     st.markdown(f"**邮箱:** {r.get('email', '-')}")
                     st.markdown(f"**当前公司:** {r.get('current_company', '-')}")
@@ -158,7 +151,7 @@ if uploaded_files:
                     st.markdown(f"**院校:** {r.get('school', '-')}")
                     st.markdown(f"**专业:** {r.get('major', '-')}")
                     st.markdown(f"**毕业年份:** {r.get('graduation_year', '-')}")
-                    st.markdown(f"**工作年限:** {r.get('work_years', '-')}")
+                    st.markdown(f"**工作年限:** {r.get('work_years', '-')}年")
 
                 st.markdown(f"**🔴 硬性匹配:** {'✅ 通过' if r.get('hard_match') else '❌ 未通过'} —— {r.get('hard_match_detail', '')}")
                 st.markdown(f"**⭐ AI 综合评分:** {r.get('ai_score', 0)} / 100")
@@ -197,6 +190,7 @@ if uploaded_files:
                     candidate_data = {
                         "name": result.get("name", "未知"),
                         "gender": result.get("gender", "未知"),
+                        "age": result.get("age", None),
                         "phone": result.get("phone", "未知"),
                         "email": result.get("email", "未知"),
                         "education": result.get("education", "未知"),
@@ -205,9 +199,6 @@ if uploaded_files:
                         "major": result.get("major", "未知"),
                         "work_years": result.get("work_years", "未知"),
                         "current_company": result.get("current_company", "未知"),
-                        "raw_resume_text": result.get("raw_resume_text", ""),
-                        "resume_file_path": result.get("resume_file_path", ""),
-                        "resume_file_name": result.get("resume_file_name", ""),
                         "ai_score": result.get("ai_score", 0),
                         "ai_strengths": result.get("ai_strengths", ""),
                         "ai_risks": result.get("ai_risks", ""),
