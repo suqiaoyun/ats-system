@@ -242,10 +242,8 @@ if st.session_state.get("detail_candidate"):
             )
             stage_notes = st.text_area("备注", key=f"notes_{cid}", height=60)
 
-            user_id = st.session_state.user.get("id") if st.session_state.user else None
-
             if st.button("✅ 确认推进", type="primary", key=f"confirm_{cid}", use_container_width=True):
-                success = advance_stage(cid, pos_id, new_stage, stage_notes, user_id)
+                success = advance_stage(cid, pos_id, new_stage, stage_notes)
                 if success:
                     # 如果推进到公海池，更新候选人状态
                     if new_stage == "公海池":
