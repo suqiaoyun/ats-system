@@ -57,7 +57,6 @@ with st.expander("➕ 新增职位", expanded=False):
         elif not jd_description:
             st.error("请填写岗位职责")
         else:
-            user_id = st.session_state.user.get("id") if st.session_state.user else None
             success = create_position(
                 title=title,
                 jd_description=jd_description,
@@ -66,7 +65,6 @@ with st.expander("➕ 新增职位", expanded=False):
                 bonus_requirements=bonus_requirements,
                 department=department,
                 headcount=headcount,
-                created_by=user_id,
             )
             if success:
                 st.success(f"✅ 职位「{title}」创建成功")
